@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 
 	"crypto/sha256"
 )
@@ -76,14 +77,19 @@ func (s Store) objToPath(o Object) string {
 	return s.qualifyBlobPath(path.Join(id[0:1], id[1:2], id[2:6], id))
 }
 
-func Load(path string) Store {
-	return Store{
-		root:           path,
+func Load(path string) (*Store, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Store{
+		root:           absPath,
 		blobRoot:       ".blobs",
 		tempRoot:       ".blobs/new",
 		stageRoot:      "",
 		objectIDHasher: sha256.New,
-	}
+	}, nil
 }
 
 func (s Store) Create() (*Writer, error) {

@@ -174,7 +174,7 @@ func (s Store) List() ([]Object, error) {
 }
 
 func (s Store) GC(gc GarbageCollector) error {
-	nodes, err := gc.Find(store)
+	nodes, err := gc.Find(s)
 	if err != nil {
 		return err
 	}

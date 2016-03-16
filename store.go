@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"crypto/sha256"
 )
@@ -49,7 +50,7 @@ func (s Store) Link(o Object, targetPath string) error {
 		}
 	}
 
-	return os.Link(storePath, stagePath)
+	return os.Symlink(storePath, stagePath)
 }
 
 func (s Store) Load(hash string) (*Object, error) {
@@ -88,15 +89,52 @@ func Load(path string) (*Store, error) {
 	}, nil
 }
 
+func (s Store) Linked() (map[Object][]string, error) {
+	seen := map[Object][]string{}
+
+	blobRoot := path.Clean(path.Join(s.root, s.blobRoot))
+
+	err := filepath.Walk(
+		path.Join(s.root, s.stageRoot),
+
+		func(p string, f os.FileInfo, err error) error {
+			if f.IsDir() || strings.HasPrefix(path.Clean(p), blobRoot) {
+				return nil
+			}
+			link, err := os.Readlink(p)
+			if err != nil {
+				/* The only error is of type PathError */
+				return nil
+			}
+
+			if !strings.HasPrefix(path.Clean(link), blobRoot) {
+				return nil
+			}
+			_, hash := path.Split(link)
+			obj := Object{id: hash}
+
+			seen[obj] = append(seen[obj], p)
+
+			return nil
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return seen, nil
+}
+
 func (s Store) List() ([]Object, error) {
 	objectList := []Object{}
 
 	err := filepath.Walk(
 		path.Join(s.root, s.blobRoot),
 		func(p string, f os.FileInfo, err error) error {
-            if f.IsDir() {
-                return nil
-            }
+			if f.IsDir() {
+				return nil
+			}
 			_, hash := path.Split(p)
 			objectList = append(objectList, Object{id: hash})
 			return nil

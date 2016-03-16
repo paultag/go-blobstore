@@ -53,7 +53,7 @@ func (s Store) Link(o Object, path string) error {
 		}
 	}
 
-	return os.Symlink(storePath, stagePath)
+	return os.Link(storePath, stagePath)
 }
 
 func (s Store) Load(hash string) (*Object, error) {
@@ -85,7 +85,7 @@ func Load(path string) (*Store, error) {
 
 	return &Store{
 		root:           absPath,
-		blobRoot:       ".blobs",
+		blobRoot:       ".blobs/store",
 		tempRoot:       ".blobs/new",
 		stageRoot:      "",
 		objectIDHasher: sha256.New,

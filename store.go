@@ -41,6 +41,17 @@ func (s Store) Link(o Object, path string) error {
 	if err := mkdirP(stagePath); err != nil {
 		return err
 	}
+
+	_, err := os.Stat(stagePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err == nil {
+		if err := os.Remove(stagePath); err != nil {
+			return err
+		}
+	}
+
 	return os.Symlink(storePath, stagePath)
 }
 

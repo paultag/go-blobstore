@@ -92,6 +92,28 @@ func Load(path string) (*Store, error) {
 	}, nil
 }
 
+func (s Store) List() ([]Object, error) {
+	objectList := []Object{}
+
+	err := filepath.Walk(
+		path.Join(s.root, s.blobRoot),
+		func(p string, f os.FileInfo, err error) error {
+            if f.IsDir() {
+                return nil
+            }
+			_, hash := path.Split(p)
+			objectList = append(objectList, Object{id: hash})
+			return nil
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return objectList, nil
+}
+
 func (s Store) Create() (*Writer, error) {
 	dir := path.Join(s.root, s.tempRoot)
 

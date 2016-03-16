@@ -173,6 +173,20 @@ func (s Store) List() ([]Object, error) {
 	return objectList, nil
 }
 
+func (s Store) GC(gc GarbageCollector) error {
+	nodes, err := gc.Find(store)
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes {
+		if err := s.Remove(node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s Store) Remove(o Object) error {
 	if !s.Exists(o) {
 		return fmt.Errorf("No such object: '%s'", o.Id())

@@ -13,6 +13,31 @@ import (
 	"crypto/sha256"
 )
 
+type GarbageCollector interface {
+	Find(s Store) ([]Object, error)
+}
+
+type DumbGarbageCollector struct{}
+
+func (d DumbGarbageCollector) Find(s Store) ([]Object, error) {
+	linked, err := s.Linked()
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.List()
+	if err != nil {
+		return nil, err
+	}
+
+	ret := []Object{}
+	for _, node := range list {
+		if _, ok := linked[node]; !ok {
+			ret = append(ret, node)
+		}
+	}
+	return ret, nil
+}
+
 type hashFunc func() hash.Hash
 
 type Store struct {
@@ -146,6 +171,15 @@ func (s Store) List() ([]Object, error) {
 	}
 
 	return objectList, nil
+}
+
+func (s Store) Remove(o Object) error {
+	if !s.Exists(o) {
+		return fmt.Errorf("No such object: '%s'", o.Id())
+	}
+
+	path := s.objToPath(o)
+	return os.Remove(path)
 }
 
 func (s Store) Create() (*Writer, error) {

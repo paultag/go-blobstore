@@ -12,10 +12,6 @@ import (
 	"crypto/sha256"
 )
 
-func mkdirP(p string) error {
-	return os.MkdirAll(path.Dir(p), 0700)
-}
-
 type hashFunc func() hash.Hash
 
 type Store struct {
@@ -32,14 +28,14 @@ func (s Store) Exists(o Object) bool {
 	return !os.IsNotExist(err)
 }
 
-func (s Store) Link(o Object, path string) error {
+func (s Store) Link(o Object, targetPath string) error {
 	if !s.Exists(o) {
 		return fmt.Errorf("No commited blob: '%s'", o.Id())
 	}
 	storePath := s.objToPath(o)
-	stagePath := s.qualifyStagePath(path)
+	stagePath := s.qualifyStagePath(targetPath)
 
-	if err := mkdirP(stagePath); err != nil {
+	if err := os.MkdirAll(path.Dir(stagePath), 0755); err != nil {
 		return err
 	}
 
@@ -117,7 +113,7 @@ func (s Store) List() ([]Object, error) {
 func (s Store) Create() (*Writer, error) {
 	dir := path.Join(s.root, s.tempRoot)
 
-	if err := mkdirP(path.Join(dir, "foo")); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
 
@@ -158,7 +154,7 @@ func (s Store) Commit(w Writer) (*Object, error) {
 	oid := fmt.Sprintf("%x", w.hash.Sum(nil))
 	obj := Object{id: oid}
 	objPath := s.objToPath(obj)
-	if err := mkdirP(objPath); err != nil {
+	if err := os.MkdirAll(path.Dir(objPath), 0755); err != nil {
 		return nil, err
 	}
 	err = os.Rename(w.path, objPath)

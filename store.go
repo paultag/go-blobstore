@@ -54,6 +54,14 @@ func (s Store) Exists(o Object) bool {
 	return !os.IsNotExist(err)
 }
 
+func (s Store) Open(o Object) (io.ReadCloser, error) {
+	fd, err := os.Open(s.objToPath(o))
+	if err != nil {
+		return nil, err
+	}
+	return fd, nil
+}
+
 func (s Store) Link(o Object, targetPath string) error {
 	if !s.Exists(o) {
 		return fmt.Errorf("No commited blob: '%s'", o.Id())

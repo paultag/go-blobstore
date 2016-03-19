@@ -2,7 +2,6 @@ package blobstore
 
 import (
 	"fmt"
-	"hash"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,32 +12,26 @@ import (
 	"crypto/sha256"
 )
 
-type GarbageCollector interface {
-	Find(s Store) ([]Object, error)
-}
+// Load {{{
 
-type DumbGarbageCollector struct{}
-
-func (d DumbGarbageCollector) Find(s Store) ([]Object, error) {
-	linked, err := s.Linked()
-	if err != nil {
-		return nil, err
-	}
-	list, err := s.List()
+func Load(path string) (*Store, error) {
+	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
 
-	ret := []Object{}
-	for _, node := range list {
-		if _, ok := linked[node]; !ok {
-			ret = append(ret, node)
-		}
-	}
-	return ret, nil
+	return &Store{
+		root:           absPath,
+		blobRoot:       ".blobs/store",
+		tempRoot:       ".blobs/new",
+		stageRoot:      "",
+		objectIDHasher: sha256.New,
+	}, nil
 }
 
-type hashFunc func() hash.Hash
+// }}}
+
+// Store {{{
 
 type Store struct {
 	root      string
@@ -49,10 +42,16 @@ type Store struct {
 	objectIDHasher hashFunc
 }
 
+// Exists {{{
+
 func (s Store) Exists(o Object) bool {
 	_, err := os.Stat(s.objToPath(o))
 	return !os.IsNotExist(err)
 }
+
+// }}}
+
+// Open {{{
 
 func (s Store) Open(o Object) (io.ReadCloser, error) {
 	fd, err := os.Open(s.objToPath(o))
@@ -61,6 +60,10 @@ func (s Store) Open(o Object) (io.ReadCloser, error) {
 	}
 	return fd, nil
 }
+
+// }}}
+
+// Link {{{
 
 func (s Store) Link(o Object, targetPath string) error {
 	if !s.Exists(o) {
@@ -86,6 +89,10 @@ func (s Store) Link(o Object, targetPath string) error {
 	return os.Symlink(storePath, stagePath)
 }
 
+// }}}
+
+// Load {{{
+
 func (s Store) Load(hash string) (*Object, error) {
 	o := Object{id: hash}
 	if s.Exists(o) {
@@ -94,33 +101,9 @@ func (s Store) Load(hash string) (*Object, error) {
 	return nil, fmt.Errorf("No such object: '%s'", hash)
 }
 
-func (s Store) qualifyBlobPath(p string) string {
-	return path.Join(s.root, s.blobRoot, p)
-}
+// }}}
 
-func (s Store) qualifyStagePath(p string) string {
-	return path.Join(s.root, s.stageRoot, p)
-}
-
-func (s Store) objToPath(o Object) string {
-	id := o.Id()
-	return s.qualifyBlobPath(path.Join(id[0:1], id[1:2], id[2:6], id))
-}
-
-func Load(path string) (*Store, error) {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Store{
-		root:           absPath,
-		blobRoot:       ".blobs/store",
-		tempRoot:       ".blobs/new",
-		stageRoot:      "",
-		objectIDHasher: sha256.New,
-	}, nil
-}
+// Linked {{{
 
 func (s Store) Linked() (map[Object][]string, error) {
 	seen := map[Object][]string{}
@@ -159,6 +142,10 @@ func (s Store) Linked() (map[Object][]string, error) {
 	return seen, nil
 }
 
+// }}}
+
+// List {{{
+
 func (s Store) List() ([]Object, error) {
 	objectList := []Object{}
 
@@ -181,6 +168,10 @@ func (s Store) List() ([]Object, error) {
 	return objectList, nil
 }
 
+// }}}
+
+// GC {{{
+
 func (s Store) GC(gc GarbageCollector) error {
 	nodes, err := gc.Find(s)
 	if err != nil {
@@ -195,6 +186,10 @@ func (s Store) GC(gc GarbageCollector) error {
 	return nil
 }
 
+// }}}
+
+// Remove {{{
+
 func (s Store) Remove(o Object) error {
 	if !s.Exists(o) {
 		return fmt.Errorf("No such object: '%s'", o.Id())
@@ -203,6 +198,10 @@ func (s Store) Remove(o Object) error {
 	path := s.objToPath(o)
 	return os.Remove(path)
 }
+
+// }}}
+
+// Create {{{
 
 func (s Store) Create() (*Writer, error) {
 	dir := path.Join(s.root, s.tempRoot)
@@ -225,43 +224,25 @@ func (s Store) Create() (*Writer, error) {
 	}, nil
 }
 
-type Writer struct {
-	path   string
-	writer io.WriteCloser
-	target io.Writer
-	hash   hash.Hash
+// }}}
+
+// path helpers {{{
+
+func (s Store) qualifyBlobPath(p string) string {
+	return path.Join(s.root, s.blobRoot, p)
 }
 
-func (n Writer) Close() error {
-	return n.writer.Close()
+func (s Store) qualifyStagePath(p string) string {
+	return path.Join(s.root, s.stageRoot, p)
 }
 
-func (n Writer) Write(b []byte) (int, error) {
-	return n.target.Write(b)
+func (s Store) objToPath(o Object) string {
+	id := o.Id()
+	return s.qualifyBlobPath(path.Join(id[0:1], id[1:2], id[2:6], id))
 }
 
-func (s Store) Commit(w Writer) (*Object, error) {
-	err := w.writer.Close()
-	if err != nil {
-		return nil, err
-	}
-	oid := fmt.Sprintf("%x", w.hash.Sum(nil))
-	obj := Object{id: oid}
-	objPath := s.objToPath(obj)
-	if err := os.MkdirAll(path.Dir(objPath), 0755); err != nil {
-		return nil, err
-	}
-	err = os.Rename(w.path, objPath)
-	if err != nil {
-		return nil, err
-	}
-	return &obj, nil
-}
+// }}}
 
-type Object struct {
-	id string
-}
+// }}}
 
-func (o Object) Id() string {
-	return o.id
-}
+// vim: foldmethod=marker

@@ -103,17 +103,18 @@ func (s Store) Load(hash string) (*Object, error) {
 
 // }}}
 
-// Linked {{{
+// Visitor {{{
 
-func (s Store) Linked() (map[Object][]string, error) {
-	seen := map[Object][]string{}
-
+func (s Store) LinkedVisitor(progn func(Object, string, os.FileInfo) error) error {
 	blobRoot := path.Clean(path.Join(s.root, s.blobRoot))
-
-	err := filepath.Walk(
+	return filepath.Walk(
 		path.Join(s.root, s.stageRoot),
-
 		func(p string, f os.FileInfo, err error) error {
+			p = path.Clean(p)
+
+			/* For each file in the stage (but anything that's not in the
+			 * blob root), let's read the link. If it's a symlink, call the
+			 * visitor, and move on */
 			if f.IsDir() || strings.HasPrefix(path.Clean(p), blobRoot) {
 				return nil
 			}
@@ -124,22 +125,28 @@ func (s Store) Linked() (map[Object][]string, error) {
 			}
 
 			if !strings.HasPrefix(path.Clean(link), blobRoot) {
+				/* If the link is pointing outside the blobRoot, we don't
+				 * care to visit it */
 				return nil
 			}
 			_, hash := path.Split(link)
 			obj := Object{id: hash}
-
-			seen[obj] = append(seen[obj], p)
-
-			return nil
+			return progn(obj, p, f)
 		},
 	)
+}
 
-	if err != nil {
-		return nil, err
-	}
+// }}}
 
-	return seen, nil
+// Linked {{{
+
+func (s Store) Linked() (map[Object][]string, error) {
+	seen := map[Object][]string{}
+	err := s.LinkedVisitor(func(obj Object, p string, info os.FileInfo) error {
+		seen[obj] = append(seen[obj], p)
+		return nil
+	})
+	return seen, err
 }
 
 // }}}

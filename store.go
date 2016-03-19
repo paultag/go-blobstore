@@ -151,6 +151,19 @@ func (s Store) Linked() (map[Object][]string, error) {
 
 // }}}
 
+// Paths {{{
+
+func (s Store) Paths() (map[string]Object, error) {
+	seen := map[string]Object{}
+	err := s.LinkedVisitor(func(obj Object, p string, info os.FileInfo) error {
+		seen[p] = obj
+		return nil
+	})
+	return seen, err
+}
+
+// }}}
+
 // List {{{
 
 func (s Store) List() ([]Object, error) {

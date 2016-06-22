@@ -40,6 +40,10 @@ func (s Store) Commit(w Writer) (*Object, error) {
 	if err := os.MkdirAll(path.Dir(objPath), 0755); err != nil {
 		return nil, err
 	}
+	err = os.Chmod(w.path, 0644)
+	if err != nil {
+		return nil, err
+	}
 	err = os.Rename(w.path, objPath)
 	if err != nil {
 		return nil, err

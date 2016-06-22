@@ -63,6 +63,18 @@ func (s Store) Open(o Object) (io.ReadCloser, error) {
 
 // }}}
 
+// OpenPath {{{
+
+func (s Store) OpenPath(p string) (io.ReadCloser, error) {
+	fd, err := os.Open(s.qualifyStagePath(p))
+	if err != nil {
+		return nil, err
+	}
+	return fd, nil
+}
+
+// }}}
+
 // Link {{{
 
 func (s Store) Link(o Object, targetPath string) error {

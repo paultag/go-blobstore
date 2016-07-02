@@ -70,7 +70,7 @@ func (s Store) Copy(o Object, w io.Writer) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return io.Copy(fd, w)
+	return io.Copy(w, fd)
 }
 
 // }}}

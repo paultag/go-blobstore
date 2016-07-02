@@ -63,6 +63,18 @@ func (s Store) Open(o Object) (io.ReadCloser, error) {
 
 // }}}
 
+// Copy {{{
+
+func (s Store) Copy(o Object, w io.Writer) (int64, error) {
+	fd, err := os.Open(s.objToPath(o))
+	if err != nil {
+		return 0, err
+	}
+	return io.Copy(fd, w)
+}
+
+// }}}
+
 // OpenPath {{{
 
 func (s Store) OpenPath(p string) (io.ReadCloser, error) {
